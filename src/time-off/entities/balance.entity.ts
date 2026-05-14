@@ -1,20 +1,22 @@
-import { Column, Entity, PrimaryGeneratedColumn, UpdateDateColumn, VersionColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, UpdateDateColumn, VersionColumn, Index } from 'typeorm';
 
-@Entity()
+@Entity('balances')
 export class Balance {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Index()
+  @Column({ name: 'employee_id' })
   employeeId: string;
 
-  @Column()
+  @Index()
+  @Column({ name: 'location_id' })
   locationId: string;
 
-  @Column('float')
+  @Column('float', { name: 'available_days' })
   availableDays: number;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'last_synced_at' })
   lastSyncedAt: Date;
 
   @VersionColumn({ default: 1 })

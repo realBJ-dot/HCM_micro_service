@@ -19,19 +19,21 @@ __decorate([
     __metadata("design:type", String)
 ], Balance.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Index)(),
+    (0, typeorm_1.Column)({ name: 'employee_id' }),
     __metadata("design:type", String)
 ], Balance.prototype, "employeeId", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Index)(),
+    (0, typeorm_1.Column)({ name: 'location_id' }),
     __metadata("design:type", String)
 ], Balance.prototype, "locationId", void 0);
 __decorate([
-    (0, typeorm_1.Column)('float'),
+    (0, typeorm_1.Column)('float', { name: 'available_days' }),
     __metadata("design:type", Number)
 ], Balance.prototype, "availableDays", void 0);
 __decorate([
-    (0, typeorm_1.UpdateDateColumn)(),
+    (0, typeorm_1.UpdateDateColumn)({ name: 'last_synced_at' }),
     __metadata("design:type", Date)
 ], Balance.prototype, "lastSyncedAt", void 0);
 __decorate([
@@ -39,6 +41,6 @@ __decorate([
     __metadata("design:type", Number)
 ], Balance.prototype, "version", void 0);
 exports.Balance = Balance = __decorate([
-    (0, typeorm_1.Entity)()
+    (0, typeorm_1.Entity)('balances')
 ], Balance);
 //# sourceMappingURL=balance.entity.js.map

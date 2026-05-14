@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Index } from 'typeorm';
 
 export enum TimeOffRequestStatus {
   PENDING = 'PENDING',
@@ -7,18 +7,20 @@ export enum TimeOffRequestStatus {
   HCM_SYNC_FAILED = 'HCM_SYNC_FAILED',
 }
 
-@Entity()
+@Entity('time_off_requests')
 export class TimeOffRequest {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Index()
+  @Column({ name: 'employee_id' })
   employeeId: string;
 
-  @Column()
+  @Index()
+  @Column({ name: 'location_id' })
   locationId: string;
 
-  @Column('float')
+  @Column('float', { name: 'requested_days' })
   requestedDays: number;
 
   @Column({
@@ -28,6 +30,6 @@ export class TimeOffRequest {
   })
   status: TimeOffRequestStatus;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }
