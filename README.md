@@ -10,6 +10,10 @@ This microservice handles employee time-off requests within the ReadyOn ecosyste
 - **Mock HCM External Service**: Includes an internal mock endpoint to simulate an external HR system with artificial network delays and chaos/resilience testing fallbacks.
 - **Swagger Documentation**: Beautiful, interactive API documentation generated automatically.
 
+## Documentation
+
+For a detailed breakdown of the system design, requirements, and edge-case handling, please see the [Technical Requirements Document (TRD)](./TRD.md).
+
 ## System Architecture & Saga Flow
 
 The system implements the **Saga Pattern** coupled with **Optimistic Concurrency Control (OCC)** to ensure the local database stays perfectly synchronized with the external HCM without locking resources.
@@ -98,3 +102,13 @@ The e2e test suite (`test/balances.e2e-spec.ts`) covers:
 ```bash
 npm run test
 ```
+
+### Test Coverage
+
+To generate an HTML and text coverage report for the E2E test suite:
+
+```bash
+npm run test:e2e -- --coverage
+```
+
+This generates a detailed `coverage-e2e` report demonstrating coverage of the service business logic.
