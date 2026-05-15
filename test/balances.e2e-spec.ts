@@ -146,4 +146,37 @@ describe('BalancesController (e2e)', () => {
     // It will NEVER be 5 (which would happen if both succeeded and overwrote each other).
     expect([7, 8]).toContain(balance.availableDays);
   });
+
+  it('Missing Balance Test: Attempt to request time off for an employee with no balance record. Expect a 400 Bad Request.', async () => {
+    // We are NOT seeding a balance for emp-2
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/balances/request')
+      .send({ employeeId: 'emp-2', locationId: 'loc-1', days: 5 });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe('Balance not found for employee at this location');
+  });
+
+  it('Batch Sync Test: Send a batch sync payload to update existing balances and create new ones.', async () => {
+    // emp-1 already has 10 days (seeded). We will update it to 20.
+    // emp-new does not exist. We will set it to 15.
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/balances/admin/batch-sync')
+      .send({
+        balances: [
+          { employeeId: 'emp-1', locationId: 'loc-1', availableDays: 20 },
+          { employeeId: 'emp-new', locationId: 'loc-new', availableDays: 15 },
+        ]
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.count).toBe(2);
+
+    const emp1Balance = await balanceRepo.findOne({ where: { employeeId: 'emp-1', locationId: 'loc-1' } });
+    expect(emp1Balance.availableDays).toBe(20);
+
+    const empNewBalance = await balanceRepo.findOne({ where: { employeeId: 'emp-new', locationId: 'loc-new' } });
+    expect(empNewBalance.availableDays).toBe(15);
+  });
 });
