@@ -31,47 +31,65 @@ export class BalancesService {
       throw new BadRequestException('Insufficient balance');
     }
 
+    // 1. Local-First Reservation (Saga Pattern: Step 1)
+    const updateResult = await this.balanceRepository.update(
+      { id: balance.id, version: balance.version },
+      { 
+        availableDays: balance.availableDays - days,
+        version: balance.version + 1,
+        lastSyncedAt: new Date()
+      }
+    );
+
+    if (updateResult.affected === 0) {
+      throw new OptimisticLockVersionMismatchError('Balance', balance.version, balance.id as any);
+    }
+
     let timeOffRequest = this.timeOffRequestRepository.create({
       employeeId,
       locationId,
       requestedDays: days,
-      status: TimeOffRequestStatus.PENDING,
+      status: TimeOffRequestStatus.PENDING_HCM,
     });
     timeOffRequest = await this.timeOffRequestRepository.save(timeOffRequest);
 
-    let response;
+    // 2. Execute External API Call with Idempotency Key
     try {
       const hcmUrl = process.env.HCM_URL || 'http://127.0.0.1:3000';
-      response = await firstValueFrom(
+      const response = await firstValueFrom(
         this.httpService.post(`${hcmUrl}/mock-hcm/deduct`, {
+          requestId: timeOffRequest.id, // Idempotency key
           employeeId,
           locationId,
           days,
         }),
       );
+
+      // 3. Finalize
+      if (response && response.status === 200) {
+        timeOffRequest.status = TimeOffRequestStatus.APPROVED;
+        await this.timeOffRequestRepository.save(timeOffRequest);
+      }
     } catch (error) {
       this.logger.error(`HCM Sync failed for request ${timeOffRequest.id}`, error.message);
-      timeOffRequest.status = TimeOffRequestStatus.HCM_SYNC_FAILED;
-      await this.timeOffRequestRepository.save(timeOffRequest);
-      return timeOffRequest;
-    }
-
-    if (response && response.status === 200) {
-      const updateResult = await this.balanceRepository.update(
-        { id: balance.id, version: balance.version },
-        { 
-          availableDays: balance.availableDays - days,
-          version: balance.version + 1,
-          lastSyncedAt: new Date()
-        }
+      
+      // 4. Compensating Transaction (Saga Pattern: Rollback local reservation)
+      // In a robust system, if this increment fails, a background reconciliation cron would catch it.
+      await this.balanceRepository.increment(
+        { id: balance.id },
+        'availableDays',
+        days
       );
 
-      if (updateResult.affected === 0) {
-        throw new OptimisticLockVersionMismatchError('Balance', balance.version, balance.id as any);
-      }
-
-      timeOffRequest.status = TimeOffRequestStatus.APPROVED;
+      // Determine the failure state
+      const isHcmRejection = error.response?.status === 400;
+      timeOffRequest.status = isHcmRejection 
+        ? TimeOffRequestStatus.REJECTED 
+        : TimeOffRequestStatus.REFUNDED;
+        
       await this.timeOffRequestRepository.save(timeOffRequest);
+      
+      return timeOffRequest;
     }
 
     return timeOffRequest;

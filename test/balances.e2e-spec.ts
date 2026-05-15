@@ -78,7 +78,7 @@ describe('BalancesController (e2e)', () => {
     expect(balance.availableDays).toBe(8);
   });
 
-  it('Resilience Test: Send a request for 999 days to trigger 503 error. Verify API returns HCM_SYNC_FAILED and balance untouched.', async () => {
+  it('Resilience Test: Send a request for 999 days to trigger 503 error. Verify API returns REFUNDED and balance untouched.', async () => {
     // Seed a specific balance just for this test to bypass the local "insufficient balance" check
     const resilienceBalance = balanceRepo.create({ employeeId: 'emp-999', locationId: 'loc-1', availableDays: 1000 });
     await balanceRepo.save(resilienceBalance);
@@ -88,14 +88,33 @@ describe('BalancesController (e2e)', () => {
       .post('/api/v1/balances/request')
       .send({ employeeId: 'emp-999', locationId: 'loc-1', days: 999 });
 
-    // The service handles the error gracefully, saving the request as failed.
+    // The service handles the error gracefully, saving the request as failed and refunding.
     expect(response.status).toBe(200);
-    expect(response.body.status).toBe(TimeOffRequestStatus.HCM_SYNC_FAILED);
+    expect(response.body.status).toBe(TimeOffRequestStatus.REFUNDED);
 
     const balance = await balanceRepo.findOne({
       where: { employeeId: 'emp-999', locationId: 'loc-1' },
     });
-    expect(balance.availableDays).toBe(1000); // Untouched
+    expect(balance.availableDays).toBe(1000); // Refunded back to 1000
+  });
+
+  it('HCM Rejection Test: Send a request for 998 days to trigger 400 error. Verify API returns REJECTED and balance untouched.', async () => {
+    // Seed a specific balance just for this test to bypass the local "insufficient balance" check
+    const rejectionBalance = balanceRepo.create({ employeeId: 'emp-998', locationId: 'loc-1', availableDays: 1000 });
+    await balanceRepo.save(rejectionBalance);
+
+    // The request for 998 days triggers the mock HCM backend to throw a 400 Insufficient Balance error
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/balances/request')
+      .send({ employeeId: 'emp-998', locationId: 'loc-1', days: 998 });
+
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe(TimeOffRequestStatus.REJECTED);
+
+    const balance = await balanceRepo.findOne({
+      where: { employeeId: 'emp-998', locationId: 'loc-1' },
+    });
+    expect(balance.availableDays).toBe(1000); // Refunded back to 1000
   });
 
   it('Race Condition Test: Concurrent requests trigger OptimisticLockVersionMismatchError.', async () => {

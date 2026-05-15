@@ -1,10 +1,11 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Index } from 'typeorm';
 
 export enum TimeOffRequestStatus {
-  PENDING = 'PENDING',
+  PENDING_HCM = 'PENDING_HCM', // Locally reserved, waiting for HCM
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   HCM_SYNC_FAILED = 'HCM_SYNC_FAILED',
+  REFUNDED = 'REFUNDED', // Compensating transaction occurred
 }
 
 @Entity('time_off_requests')
@@ -26,7 +27,7 @@ export class TimeOffRequest {
   @Column({
     type: 'varchar',
     enum: TimeOffRequestStatus,
-    default: TimeOffRequestStatus.PENDING,
+    default: TimeOffRequestStatus.PENDING_HCM,
   })
   status: TimeOffRequestStatus;
 
