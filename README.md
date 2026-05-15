@@ -15,49 +15,22 @@ This microservice handles employee time-off requests within the ReadyOn ecosyste
 The system implements the **Saga Pattern** coupled with **Optimistic Concurrency Control (OCC)** to ensure the local database stays perfectly synchronized with the external HCM without locking resources.
 
 ```mermaid
-sequenceDiagram
-    participant User
-    participant LocalDB as SQLite (Local)
-    participant Microservice as Time-Off Service
-    participant HCM as External HCM
-
-    User->>Microservice: POST /api/v1/balances/request
-    Microservice->>LocalDB: Fetch Balance
-    LocalDB-->>Microservice: available_days & version
+flowchart TD
+    Start([User Requests Time Off]) --> CheckBal{Sufficient<br/>Local Balance?}
+    CheckBal -- No --> Reject400[400 Bad Request]
+    CheckBal -- Yes --> OCC[Saga Step 1:<br/>Reserve Local Balance via OCC]
     
-    alt Insufficient Balance
-        Microservice-->>User: 400 Bad Request
-    else Sufficient Balance
-        rect rgb(40, 40, 40)
-            note right of Microservice: Saga Step 1: Local Reservation
-            Microservice->>LocalDB: UPDATE balances SET days=days-X, version=version+1 WHERE version=Z
-            LocalDB-->>Microservice: update_result
-        end
-        
-        alt OCC Conflict (Concurrent Request)
-            Microservice-->>User: 500 OptimisticLockVersionMismatchError
-        else OCC Success
-            Microservice->>LocalDB: INSERT time_off_requests (status: PENDING_HCM)
-            
-            rect rgb(40, 40, 40)
-                note right of Microservice: Saga Step 2: External Execution
-                Microservice->>HCM: POST /mock-hcm/deduct { requestId, days }
-                HCM-->>Microservice: 200 OK or Error
-            end
-            
-            alt HCM Success
-                Microservice->>LocalDB: UPDATE time_off_requests (status: APPROVED)
-                Microservice-->>User: 200 Success (APPROVED)
-            else HCM Failure or Timeout
-                rect rgb(40, 40, 40)
-                    note right of Microservice: Saga Step 3: Compensating Transaction
-                    Microservice->>LocalDB: UPDATE balances SET days=days+X
-                    Microservice->>LocalDB: UPDATE time_off_requests (status: REFUNDED)
-                end
-                Microservice-->>User: 200 Success (REFUNDED)
-            end
-        end
-    end
+    OCC --> OCCCheck{OCC<br/>Success?}
+    OCCCheck -- No --> Reject500[500 Concurrent Update Error]
+    OCCCheck -- Yes --> SetPending[Mark Request PENDING_HCM]
+    
+    SetPending --> API[Saga Step 2:<br/>Call External HCM API]
+    
+    API --> APICheck{API<br/>Success?}
+    APICheck -- Yes --> Approved[Finalize: <br/>Mark Request APPROVED]
+    APICheck -- No --> Refund[Saga Step 3:<br/>Compensating Transaction<br/>Refund Local Balance]
+    
+    Refund --> MarkRejected[Mark Request REJECTED/REFUNDED]
 ```
 
 ## Prerequisites
