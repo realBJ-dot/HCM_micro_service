@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+coverage-e2e/
+test/coverage/
+.env
+hcm_micro.sqlite
